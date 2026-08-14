@@ -137,12 +137,33 @@ function computeRecommended(d) {
   }
   return { status: d['회원상태'], reason: '규칙 미해당(원본 상태 유지)', confidence: 'confirmed' };
 }
-function needsChange(d) { return computeRecommended(d).status !== d['회원상태']; }
+function needsChange(d) {
+  const rec = computeRecommended(d);
+  if (rec.status === d['회원상태']) return false;
+  if (d['_ackStatus'] && d['_ackStatus'] === rec.status) return false; // 이미 확인 처리됨(권장값 동일)
+  return true;
+}
+function isAcknowledgedHold(d) {
+  const rec = computeRecommended(d);
+  return rec.status !== d['회원상태'] && d['_ackStatus'] === rec.status;
+}
+function ackNoChange(d) {
+  const rec = computeRecommended(d);
+  d['_ackStatus'] = rec.status;
+  d['_ackAt'] = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  saveLocal();
+}
+function ackUndo(d) {
+  d['_ackStatus'] = null;
+  d['_ackAt'] = null;
+  saveLocal();
+}
 
 /* ===================== 세그먼트 ===================== */
 const SEGMENTS = [
   { key: 'all', label: '전체 후원자', test: () => true },
   { key: 'status_change', label: `오늘(${TODAY_LABEL}) 기준 변경 대상`, test: d => needsChange(d) },
+  { key: 'ack_hold', label: '확인 완료(변경 보류)', test: d => isAcknowledgedHold(d) },
   { key: 'convert_target', label: '정기후원 전환 대상', test: d => d['회원상태'] === '잠재후원자' && d['휴대전화번호'] },
   { key: 'potential', label: '잠재후원자 전체', test: d => d['회원상태'] === '잠재후원자' },
   { key: 'settled', label: '정착 후원자', test: d => d['회원상태'] === '정착' },
@@ -315,8 +336,14 @@ function renderTable() {
       const memoFlag = hasMemo(d) ? ' 📝' : '';
       const newTag = d['_isNew'] ? '<span class="new-tag">신규입력</span>' : '';
       const rec = computeRecommended(d);
-      const changeFlag = rec.status !== status
-        ? `<span class="change-flag ${rec.confidence}" title="권장: ${rec.status} · ${rec.reason}">→ ${rec.status}</span>` : '';
+      let changeFlag = '';
+      if (rec.status !== status) {
+        if (isAcknowledgedHold(d)) {
+          changeFlag = `<span class="change-flag ack" title="확인 처리됨(${d['_ackAt'] || ''}) · 권장: ${rec.status} · ${rec.reason}">확인됨 · ${rec.status}</span>`;
+        } else {
+          changeFlag = `<span class="change-flag ${rec.confidence}" title="권장: ${rec.status} · ${rec.reason}">→ ${rec.status}</span><button class="ack-btn" data-ack-uid="${d['_uid']}" title="변경 불필요 확인 처리">확인</button>`;
+        }
+      }
       return `
       <tr data-uid="${d['_uid']}">
         <td class="tabular muted">${d['회원번호'] || '-'}</td>
@@ -331,6 +358,13 @@ function renderTable() {
       </tr>`;
     }).join('');
     Array.from(tbody.querySelectorAll('tr')).forEach(tr => { tr.onclick = () => openDrawer(tr.dataset.uid); });
+    Array.from(tbody.querySelectorAll('.ack-btn')).forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const d = DONORS.find(x => x['_uid'] === btn.dataset.ackUid);
+        if (d) { ackNoChange(d); renderAll(); }
+      };
+    });
   }
   renderPager(list.length, totalPages);
   renderStatRow(list.length);
@@ -396,17 +430,30 @@ function openDrawer(uidVal) {
   const rec = computeRecommended(d);
   const recBox = document.getElementById('recommendBox');
   if (rec.status !== d['회원상태']) {
-    recBox.innerHTML = `
+    const acked = isAcknowledgedHold(d);
+    recBox.innerHTML = acked ? `
+      <div class="rec-title">확인 처리됨 · ${d['_ackAt'] || ''}</div>
+      <div class="rec-body">${d['회원상태']} 유지 (권장: <strong>${rec.status}</strong>)</div>
+      <div class="rec-reason">${rec.reason}</div>
+      <button class="btn-ghost sm" id="applyRecBtn">권장 상태로 채우기</button>
+      <button class="btn-ghost sm" id="ackUndoBtn">확인 취소</button>
+    ` : `
       <div class="rec-title">오늘(${TODAY_LABEL}) 기준 권장 상태${rec.confidence === 'estimated' ? ' · 추정' : ''}</div>
       <div class="rec-body">${d['회원상태']} → <strong>${rec.status}</strong></div>
       <div class="rec-reason">${rec.reason}</div>
-      <button class="btn-ghost sm" id="applyRecBtn">권장 상태로 채우기</button>`;
+      <button class="btn-ghost sm" id="applyRecBtn">권장 상태로 채우기</button>
+      <button class="btn-ghost sm" id="ackBtn">변경 불필요(확인 처리)</button>
+    `;
     recBox.classList.add('show');
   } else { recBox.innerHTML = ''; recBox.classList.remove('show'); }
 
   renderForm(d);
   const applyBtn = document.getElementById('applyRecBtn');
   if (applyBtn) applyBtn.onclick = () => { document.querySelector('[data-field="회원상태"]').value = rec.status; };
+  const ackBtn = document.getElementById('ackBtn');
+  if (ackBtn) ackBtn.onclick = () => { ackNoChange(d); renderAll(); closeDrawer(); };
+  const ackUndoBtn = document.getElementById('ackUndoBtn');
+  if (ackUndoBtn) ackUndoBtn.onclick = () => { ackUndo(d); renderAll(); closeDrawer(); };
 
   document.getElementById('saveMsg').classList.remove('show');
   document.getElementById('overlay').classList.add('open');
