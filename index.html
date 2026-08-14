@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>후원자 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F1F3F0; --surface:#FFFFFF; --surface-2:#F7F8F5;
+    --ink:#182420; --ink-soft:#5B6D65; --ink-faint:#8B9A93;
+    --border:#DEE3DC; --border-soft:#EAEDE7;
+    --teal:#1B4B43; --teal-soft:#DCE8E4;
+    --gold:#B87F23; --gold-soft:#F3E6CE;
+    --red:#A8443B; --red-soft:#F1DEDC;
+    --blue:#3B6EA5; --blue-soft:#DDE7F0;
+    --radius:10px;
+    --shadow: 0 1px 2px rgba(20,30,25,0.06), 0 4px 14px rgba(20,30,25,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--bg); color:var(--ink); font-family:'Noto Sans KR', -apple-system, sans-serif; font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3{ font-family:'Noto Serif KR', serif; margin:0; font-weight:700; letter-spacing:-0.01em;}
+  .tabular{ font-variant-numeric: tabular-nums; }
+  button{ font-family:inherit; }
+
+  /* ---------- Upload screen ---------- */
+  .upload-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .upload-card{ width:100%; max-width:480px; background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); padding:32px; }
+  .upload-card .mark{ width:10px;height:10px;border-radius:50%; background:var(--gold); display:inline-block; margin-right:8px; }
+  .upload-card h1{ font-size:20px; margin-bottom:4px; }
+  .upload-card .desc{ color:var(--ink-soft); font-size:13px; margin-bottom:22px; }
+  .dropzone{
+    border:1.5px dashed var(--border); border-radius:10px; padding:28px 16px; text-align:center;
+    color:var(--ink-soft); font-size:13px; cursor:pointer; margin-bottom:14px;
+  }
+  .dropzone:hover, .dropzone.drag{ border-color:var(--teal); background:var(--teal-soft); color:var(--teal); }
+  .dropzone .big{ font-weight:600; color:var(--ink); margin-bottom:4px; font-size:14px; }
+  .resume-box{
+    border:1px solid var(--border); background:var(--surface-2); border-radius:10px; padding:14px 16px;
+    margin-bottom:14px; font-size:12.5px; color:var(--ink-soft); display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .resume-box button{ background:var(--teal); color:#fff; border:none; border-radius:7px; padding:7px 12px; font-size:12.5px; cursor:pointer; font-weight:600; flex:none;}
+  .upload-note{ font-size:11.5px; color:var(--ink-faint); line-height:1.6; margin-top:16px; }
+  .upload-error{ color:var(--red); font-size:12.5px; margin-top:8px; display:none; }
+  .upload-error.show{ display:block; }
+
+  /* ---------- Layout ---------- */
+  .app{ display:none; }
+  .app.show{ display:flex; min-height:100vh; }
+  .sidebar{ width:236px; flex:none; background:var(--teal); color:#EAF1EE; padding:22px 18px 18px; position:sticky; top:0; height:100vh; overflow-y:auto; }
+  .main{ flex:1; min-width:0; padding:22px 26px 60px; }
+
+  .brand{ display:flex; align-items:baseline; gap:8px; margin-bottom:2px;}
+  .brand .mark{ width:10px;height:10px;border-radius:50%; background:var(--gold); flex:none; }
+  .brand h1{ font-size:17px; color:#fff; }
+  .brand-sub{ font-size:11.5px; color:#B9CCC5; margin:2px 0 18px 18px; letter-spacing:0.02em;}
+
+  .side-section{ margin-bottom:22px; }
+  .side-title{ font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#9FBBB2; margin-bottom:10px; font-weight:600; }
+  .side-btn{ display:flex; justify-content:space-between; align-items:center; width:100%; text-align:left; background:transparent; border:none; color:#DCEAE5; font-size:13px; padding:7px 8px; border-radius:7px; cursor:pointer; margin-bottom:2px; }
+  .side-btn:hover{ background:rgba(255,255,255,0.08); }
+  .side-btn.active{ background:rgba(255,255,255,0.16); color:#fff; font-weight:600; }
+  .side-btn .n{ color:#9FBBB2; font-size:11.5px; }
+  .side-btn.active .n{ color:#EAF1EE; }
+
+  .filter-group{ margin-bottom:16px; }
+  .filter-label{ font-size:11px; color:#9FBBB2; margin-bottom:6px; font-weight:600; letter-spacing:0.03em; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-size:12px; padding:4px 9px; border-radius:100px; border:1px solid rgba(255,255,255,0.22); color:#DCEAE5; background:rgba(255,255,255,0.05); cursor:pointer; user-select:none; }
+  .chip:hover{ background:rgba(255,255,255,0.14); }
+  .chip.active{ background:var(--gold); border-color:var(--gold); color:#241804; font-weight:600; }
+
+  .reset-link{ font-size:12px; color:#B9CCC5; text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; margin-top:4px; display:block; }
+  .reset-link:hover{ color:#fff; }
+  .side-divider{ height:1px; background:rgba(255,255,255,0.14); margin:16px 0; }
+  .side-danger{ font-size:11.5px; color:#E8C9C5; text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; }
+
+  /* ---------- Header / ribbon ---------- */
+  .page-head{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:16px; gap:20px; flex-wrap:wrap;}
+  .page-head h2{ font-size:22px; }
+  .page-head .desc{ color:var(--ink-soft); font-size:13px; margin-top:4px; }
+  .head-actions{ display:flex; gap:8px; align-items:center; }
+  .btn-primary{ background:var(--teal); color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-primary:hover{ background:#153b34; }
+  .btn-outline{ background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:8px; padding:9px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-outline:hover{ background:var(--surface-2); }
+  .log{ font-family:'SFMono-Regular',Consolas,monospace; font-size:11px; color:var(--ink-faint); background:var(--surface-2); border:1px solid var(--border-soft); border-radius:8px; padding:8px 12px; white-space:pre-line; max-width:340px; line-height:1.6; }
+
+  .ribbon{ display:flex; height:26px; border-radius:6px; overflow:hidden; margin-bottom:10px; border:1px solid var(--border); }
+  .ribbon-seg{ cursor:pointer; transition:opacity .15s; }
+  .ribbon-seg:hover{ opacity:0.85; }
+  .ribbon-legend{ display:flex; gap:16px; flex-wrap:wrap; margin-bottom:22px; }
+  .legend-item{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); cursor:pointer; }
+  .legend-dot{ width:9px;height:9px;border-radius:2px; flex:none; }
+
+  .stat-row{ display:flex; gap:12px; margin-bottom:22px; flex-wrap:wrap; }
+  .stat-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; min-width:108px; box-shadow:var(--shadow); }
+  .stat-card .num{ font-size:22px; font-weight:700; font-family:'Noto Serif KR',serif; }
+  .stat-card .lbl{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+
+  .toolbar{ display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .search-box{ flex:1; min-width:220px; display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 12px; }
+  .search-box input{ border:none; outline:none; flex:1; font-size:13.5px; background:transparent; color:var(--ink); font-family:inherit; }
+  .search-box svg{ flex:none; opacity:0.5; }
+  select.filter-select{ border:1px solid var(--border); background:var(--surface); border-radius:8px; padding:8px 10px; font-size:12.5px; color:var(--ink); font-family:inherit; cursor:pointer; }
+  .result-count{ font-size:12.5px; color:var(--ink-soft); margin-left:auto; white-space:nowrap; }
+
+  .table-wrap{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{ text-align:left; font-size:11.5px; color:var(--ink-soft); font-weight:600; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--surface-2); white-space:nowrap; cursor:pointer; user-select:none; }
+  thead th:hover{ color:var(--ink); }
+  tbody td{ padding:10px 14px; border-bottom:1px solid var(--border-soft); font-size:13px; white-space:nowrap; }
+  tbody tr{ cursor:pointer; }
+  tbody tr:hover td{ background:var(--surface-2); }
+  tbody tr:last-child td{ border-bottom:none; }
+  .name-cell{ font-weight:600; }
+  .muted{ color:var(--ink-faint); }
+  .new-tag{ font-size:10px; background:var(--blue-soft); color:var(--blue); padding:2px 6px; border-radius:100px; margin-left:6px; font-weight:600; }
+
+  .badge{ display:inline-block; font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:100px; }
+  .badge-정착{ background:var(--teal-soft); color:var(--teal); }
+  .badge-잠재후원자{ background:var(--gold-soft); color:var(--gold); }
+  .badge-이탈{ background:var(--red-soft); color:var(--red); }
+  .badge-신규{ background:var(--blue-soft); color:var(--blue); }
+
+  .pager{ display:flex; align-items:center; justify-content:center; gap:14px; padding:16px 0 4px; }
+  .pager button{ border:1px solid var(--border); background:var(--surface); border-radius:7px; padding:6px 12px; font-size:12.5px; cursor:pointer; color:var(--ink); }
+  .pager button:disabled{ opacity:0.4; cursor:not-allowed; }
+  .pager .pg-info{ font-size:12.5px; color:var(--ink-soft); }
+
+  .empty-state{ text-align:center; padding:60px 20px; color:var(--ink-soft); }
+  .empty-state .big{ font-size:15px; font-weight:600; color:var(--ink); margin-bottom:6px; }
+
+  .status-banner{ display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; background:var(--gold-soft); border:1px solid #E6C88A; border-radius:var(--radius); padding:14px 18px; margin-bottom:18px; }
+  .sb-title{ font-weight:700; font-size:14px; color:#6E4A12; }
+  .sb-sub{ font-size:12px; color:#8A6624; margin-top:3px; }
+  .sb-actions{ display:flex; gap:8px; flex:none; }
+  .btn-ghost{ background:transparent; border:1px solid #C79A44; color:#6E4A12; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .btn-ghost:hover{ background:rgba(199,154,68,0.12); }
+  .btn-ghost.sm{ padding:6px 10px; font-size:12px; }
+  .change-flag{ display:inline-block; font-size:10.5px; margin-left:6px; padding:2px 6px; border-radius:100px; background:#FBEFD6; color:#8A6624; font-weight:600; cursor:help; white-space:nowrap; }
+  .change-flag.estimated{ background:#EFE6F6; color:#5B3A85; }
+  .rec-box{ display:none; border-radius:8px; padding:10px 12px; margin-bottom:16px; background:var(--surface-2); border:1px solid var(--border); }
+  .rec-box.show{ display:block; }
+  .rec-title{ font-size:11px; color:var(--ink-faint); font-weight:600; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.03em;}
+  .rec-body{ font-size:14px; margin-bottom:3px; }
+  .rec-body strong{ color:var(--teal); }
+  .rec-reason{ font-size:12px; color:var(--ink-soft); margin-bottom:8px; }
+
+  /* ---------- Drawer (상세/수정/추가 겸용) ---------- */
+  .overlay{ position:fixed; inset:0; background:rgba(15,20,17,0.35); opacity:0; pointer-events:none; transition:opacity .18s; z-index:40; }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+  .drawer{ position:fixed; top:0; right:0; height:100vh; width:440px; max-width:94vw; background:var(--surface); box-shadow:-8px 0 30px rgba(15,20,17,0.18); transform:translateX(100%); transition:transform .2s ease; z-index:41; overflow-y:auto; }
+  .drawer.open{ transform:translateX(0); }
+  .drawer-head{ padding:20px 22px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; position:sticky; top:0; background:var(--surface); z-index:2;}
+  .drawer-head h3{ font-size:18px; }
+  .drawer-head .sub{ font-size:12px; color:var(--ink-soft); margin-top:3px; }
+  .drawer-close{ border:none; background:var(--surface-2); border-radius:50%; width:28px;height:28px; cursor:pointer; font-size:15px; color:var(--ink-soft); flex:none; }
+  .drawer-body{ padding:18px 22px 30px; }
+
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 12px; margin-bottom:16px; }
+  .form-field{ display:flex; flex-direction:column; }
+  .form-field.full{ grid-column:1 / -1; }
+  .form-field label{ font-size:11px; color:var(--ink-soft); margin-bottom:4px; }
+  .form-field input, .form-field select, .form-field textarea{
+    border:1px solid var(--border); border-radius:7px; padding:8px 9px; font-size:13px; font-family:inherit; color:var(--ink);
+  }
+  .form-field textarea{ min-height:70px; resize:vertical; }
+
+  .divider{ height:1px; background:var(--border-soft); margin:18px 0; }
+  .edit-title{ font-size:12.5px; font-weight:700; color:var(--ink); margin-bottom:10px; text-transform:uppercase; letter-spacing:0.04em;}
+  .save-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:6px;}
+  .save-row-left{ display:flex; align-items:center; gap:10px; }
+  .btn-save{ background:var(--teal); color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-save:hover{ background:#153b34; }
+  .btn-delete{ background:transparent; color:var(--red); border:1px solid var(--red-soft); border-radius:8px; padding:9px 14px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .btn-delete:hover{ background:var(--red-soft); }
+  .save-msg{ font-size:12px; color:var(--teal); opacity:0; transition:opacity .2s; }
+  .save-msg.show{ opacity:1; }
+  .meta-note{ font-size:11.5px; color:var(--ink-faint); margin-bottom:14px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== 업로드 화면 ===================== -->
+<div class="upload-screen" id="uploadScreen">
+  <div class="upload-card">
+    <h1><span class="mark"></span>후원자 관리</h1>
+    <div class="desc">엑셀 파일을 업로드하면 브라우저 안에서만 처리됩니다. 서버로 전송되지 않습니다.</div>
+
+    <div class="resume-box" id="resumeBox" style="display:none;">
+      <span id="resumeText"></span>
+      <button id="resumeBtn">이어서 열기</button>
+    </div>
+
+    <div class="dropzone" id="dropzone">
+      <div class="big">파일을 끌어다 놓거나 클릭해서 선택</div>
+      <div>.xlsx / .xls / .csv</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;" />
+    <div class="upload-error" id="uploadError"></div>
+
+    <div class="upload-note">
+      · 업로드한 파일 내용은 이 리포지토리/서버 어디에도 저장되지 않습니다.<br/>
+      · 추가·수정·삭제 내용은 이 브라우저(기기)에만 자동 저장됩니다.<br/>
+      · 다른 기기에서 이어서 쓰려면 "내보내기"로 파일을 받아 그 기기에서 다시 업로드하세요.
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 메인 앱 ===================== -->
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="mark"></span><h1>후원자 관리</h1></div>
+    <div class="brand-sub" id="brandSub">-</div>
+
+    <div class="side-section">
+      <div class="side-title">빠른 세그먼트</div>
+      <div id="segmentList"></div>
+    </div>
+
+    <div class="side-section">
+      <div class="filter-label">회원상태</div>
+      <div class="chip-row" id="filterStatus"></div>
+    </div>
+    <div class="side-section">
+      <div class="filter-label">최초등록구분</div>
+      <div class="chip-row" id="filterFirstReg"></div>
+    </div>
+    <div class="side-section">
+      <div class="filter-label">등록구분</div>
+      <div class="chip-row" id="filterRegType"></div>
+    </div>
+    <div class="side-section">
+      <div class="filter-label">회원구분</div>
+      <div class="chip-row" id="filterMemberType"></div>
+    </div>
+    <div class="side-section">
+      <div class="filter-label">납부방법</div>
+      <div class="chip-row" id="filterPayMethod"></div>
+    </div>
+    <div class="side-section">
+      <div class="filter-label">성별</div>
+      <div class="chip-row" id="filterGender"></div>
+    </div>
+
+    <button class="reset-link" id="resetFilters">필터 초기화</button>
+    <div class="side-divider"></div>
+    <button class="side-danger" id="reuploadBtn">다른 파일 업로드</button>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h2>후원자 검색 · 세그먼트</h2>
+        <div class="desc">성명/전화/이메일/회원번호 검색, 상태별 필터링, 개별 항목 추가·수정·삭제</div>
+      </div>
+      <div class="head-actions">
+        <div class="log" id="logBox"></div>
+      </div>
+    </div>
+
+    <div class="toolbar" style="margin-bottom:18px;">
+      <button class="btn-primary" id="addDonorBtn">+ 새 후원자 추가</button>
+      <button class="btn-outline" id="exportBtn">내보내기 (.xlsx)</button>
+    </div>
+
+    <div id="statusChangeBanner"></div>
+
+    <div class="ribbon" id="ribbon"></div>
+    <div class="ribbon-legend" id="ribbonLegend"></div>
+
+    <div class="stat-row" id="statRow"></div>
+
+    <div class="toolbar">
+      <div class="search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" type="text" placeholder="성명, 전화번호, 이메일, 회원번호 검색" />
+      </div>
+      <select class="filter-select" id="sortSelect">
+        <option value="default">기본 정렬(회원번호)</option>
+        <option value="name">성명순</option>
+        <option value="age_desc">나이 많은순</option>
+        <option value="age_asc">나이 적은순</option>
+        <option value="last_pay_desc">최종납부 최신순</option>
+        <option value="last_pay_asc">최종납부 오래된순</option>
+        <option value="recent_edit">최근 수정순</option>
+      </select>
+      <div class="result-count" id="resultCount"></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:80px;">회원번호</th>
+            <th style="width:100px;">성명</th>
+            <th style="width:132px;">상태</th>
+            <th style="width:56px;">나이</th>
+            <th style="width:44px;">성별</th>
+            <th style="width:120px;">휴대전화</th>
+            <th>이메일</th>
+            <th style="width:90px;">최종납부</th>
+            <th style="width:80px;">납부방법</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <div class="big">검색 결과가 없습니다</div>
+        <div>검색어나 필터 조건을 조정해 보세요.</div>
+      </div>
+    </div>
+
+    <div class="pager" id="pager"></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <h3 id="drawerName">-</h3>
+      <div class="sub" id="drawerSub">-</div>
+    </div>
+    <button class="drawer-close" id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="rec-box" id="recommendBox"></div>
+    <div class="meta-note" id="metaNote"></div>
+
+    <div class="edit-title" id="formTitle">정보 수정</div>
+    <div class="form-grid" id="formGrid"></div>
+
+    <div class="save-row">
+      <div class="save-row-left">
+        <button class="btn-save" id="saveBtn">저장</button>
+        <span class="save-msg" id="saveMsg">저장됨</span>
+      </div>
+      <button class="btn-delete" id="deleteBtn">삭제</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
